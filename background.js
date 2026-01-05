@@ -10,15 +10,15 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     await chrome.storage.local.set({
       settings: {
         enabled: true,
-        showNotification: true,
-        playSound: false,
         checkInterval: 3
       },
       stats: {
         todayCount: 0,
-        totalCount: 0,
+        todayPoints: 0,
+        totalPoints: 0,
         recentActivity: [],
-        lastResetDate: new Date().toDateString()
+        lastResetDate: new Date().toDateString(),
+        streamerStats: {} // { streamerName: { count: 0, points: 0 } }
       },
       autoClaimSettings: {}
     });
@@ -53,31 +53,48 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // 處理獎勵領取事件
 async function handleBonusClaimed(message, sender) {
   console.log('[Twitch Auto Claim] Bonus claimed:', message.streamer, 'at', message.time);
+  console.log('[Twitch Auto Claim] Points earned:', message.pointsEarned);
   
   // 獲取當前統計資料
   const result = await chrome.storage.local.get(['stats', 'settings']);
   let stats = result.stats || {
     todayCount: 0,
-    totalCount: 0,
+    todayPoints: 0,
+    totalPoints: 0,
     recentActivity: [],
-    lastResetDate: new Date().toDateString()
+    lastResetDate: new Date().toDateString(),
+    streamerStats: {}
   };
   
   // 檢查是否需要重置今日計數
   const today = new Date().toDateString();
   if (stats.lastResetDate !== today) {
     stats.todayCount = 0;
+    stats.todayPoints = 0;
     stats.lastResetDate = today;
   }
   
   // 更新統計
+  const pointsEarned = message.pointsEarned || 50;
   stats.todayCount++;
-  stats.totalCount++;
+  stats.todayPoints += pointsEarned;
+  stats.totalPoints += pointsEarned;
+  
+  // 更新實況主統計
+  if (!stats.streamerStats) {
+    stats.streamerStats = {};
+  }
+  if (!stats.streamerStats[message.streamer]) {
+    stats.streamerStats[message.streamer] = { count: 0, points: 0 };
+  }
+  stats.streamerStats[message.streamer].count++;
+  stats.streamerStats[message.streamer].points += pointsEarned;
   
   // 新增活動記錄
   stats.recentActivity.unshift({
     streamer: message.streamer,
     time: message.time,
+    points: pointsEarned,
     timestamp: Date.now(),
     tabId: sender.tab?.id
   });
@@ -90,20 +107,17 @@ async function handleBonusClaimed(message, sender) {
   // 儲存統計
   await chrome.storage.local.set({ stats });
   
-  // 顯示通知（如果啟用）
-  const settings = result.settings || {};
-  if (settings.showNotification !== false) {
-    showNotification(message.streamer, stats.todayCount, stats.totalCount);
-  }
+  // 顯示通知
+  showNotification(message.streamer, pointsEarned, stats.todayPoints, stats.totalPoints);
 }
 
 // 顯示通知
-function showNotification(streamer, todayCount, totalCount) {
+function showNotification(streamer, pointsEarned, todayPoints, totalPoints) {
   chrome.notifications.create({
     type: 'basic',
     iconUrl: 'icons/icon48.png',
     title: '🎁 Twitch 獎勵已領取',
-    message: `在 ${streamer} 頻道領取獎勵！\n今日：${todayCount} 次 | 總計：${totalCount} 次`,
+    message: `在 ${streamer} 頻道獲得 ${pointsEarned} 點！\n今日：${todayPoints} 點 | 總計：${totalPoints} 點`,
     priority: 1,
     requireInteraction: false
   });
@@ -136,6 +150,7 @@ function scheduleDailyReset() {
     const result = await chrome.storage.local.get(['stats']);
     if (result.stats) {
       result.stats.todayCount = 0;
+      result.stats.todayPoints = 0;
       result.stats.lastResetDate = new Date().toDateString();
       await chrome.storage.local.set({ stats: result.stats });
       console.log('[Twitch Auto Claim] Daily count reset');

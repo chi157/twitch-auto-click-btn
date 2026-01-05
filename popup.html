@@ -26,12 +26,16 @@
     <!-- 統計資訊 -->
     <div class="stats">
       <div class="stat-item">
-        <span class="stat-label">今日已領取</span>
+        <span class="stat-label">今日已領</span>
         <span class="stat-value" id="todayCount">0</span>
       </div>
       <div class="stat-item">
-        <span class="stat-label">總計領取</span>
-        <span class="stat-value" id="totalCount">0</span>
+        <span class="stat-label">今日點數</span>
+        <span class="stat-value" id="todayPoints">0</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">總計點數</span>
+        <span class="stat-value" id="totalPoints">0</span>
       </div>
     </div>
 
@@ -60,18 +64,6 @@
     <div class="section">
       <h2>⚙️ 設定</h2>
       <div class="settings">
-        <div class="setting-item">
-          <label>
-            <input type="checkbox" id="notificationToggle" checked>
-            顯示領取通知
-          </label>
-        </div>
-        <div class="setting-item">
-          <label>
-            <input type="checkbox" id="soundToggle">
-            播放提示音效
-          </label>
-        </div>
         <div class="setting-item">
           <label>
             檢查間隔（秒）

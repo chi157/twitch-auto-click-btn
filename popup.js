@@ -3,16 +3,16 @@
 let twitchTabs = [];
 let settings = {
   enabled: true,
-  showNotification: true,
-  playSound: false,
   checkInterval: 3,
   autoClaimSettings: {} // { streamerName: true/false }
 };
 
 let stats = {
   todayCount: 0,
-  totalCount: 0,
-  recentActivity: []
+  todayPoints: 0,
+  totalPoints: 0,
+  recentActivity: [],
+  streamerStats: {} // { streamerName: { count: 0, points: 0 } }
 };
 
 // DOM 元素
@@ -46,11 +46,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 function initElements() {
   elements.globalToggle = document.getElementById('globalToggle');
   elements.todayCount = document.getElementById('todayCount');
-  elements.totalCount = document.getElementById('totalCount');
+  elements.totalCount = document.getElementById('todayPoints');
+  elements.totalPoints = document.getElementById('totalPoints');
   elements.twitchTabs = document.getElementById('twitchTabs');
   elements.recentActivity = document.getElementById('recentActivity');
-  elements.notificationToggle = document.getElementById('notificationToggle');
-  elements.soundToggle = document.getElementById('soundToggle');
   elements.intervalInput = document.getElementById('intervalInput');
   elements.clearDataBtn = document.getElementById('clearDataBtn');
   elements.refreshBtn = document.getElementById('refreshBtn');
@@ -70,8 +69,6 @@ async function loadSettings() {
   
   // 更新 UI
   elements.globalToggle.checked = settings.enabled;
-  elements.notificationToggle.checked = settings.showNotification;
-  elements.soundToggle.checked = settings.playSound;
   elements.intervalInput.value = settings.checkInterval;
 }
 
@@ -86,6 +83,7 @@ async function loadStats() {
     const today = new Date().toDateString();
     if (stats.lastResetDate !== today) {
       stats.todayCount = 0;
+      stats.todayPoints = 0;
       stats.lastResetDate = today;
       await saveStats();
     }
@@ -126,7 +124,8 @@ function updateUI() {
 // 更新統計數字
 function updateStats() {
   elements.todayCount.textContent = stats.todayCount;
-  elements.totalCount.textContent = stats.totalCount;
+  elements.totalCount.textContent = stats.todayPoints?.toLocaleString() || '0';
+  elements.totalPoints.textContent = stats.totalPoints?.toLocaleString() || '0';
 }
 
 // 更新 Twitch 分頁列表
@@ -141,7 +140,9 @@ function updateTwitchTabsList() {
     return;
   }
 
-  elements.twitchTabs.innerHTML = twitchTabs.map(tab => `
+  elements.twitchTabs.innerHTML = twitchTabs.map(tab => {
+    const streamerStats = stats.streamerStats?.[tab.streamerName] || { count: 0, points: 0 };
+    return `
     <div class="tab-item" data-tab-id="${tab.id}">
       <div class="tab-info">
         <div class="tab-streamer">
@@ -149,6 +150,9 @@ function updateTwitchTabsList() {
           ${tab.streamerName}
         </div>
         <div class="tab-url">${tab.title}</div>
+        <div class="tab-stats">
+          <small>🎯 ${streamerStats.count} 次 | 💰 ${streamerStats.points.toLocaleString()} 點</small>
+        </div>
       </div>
       <div class="tab-toggle">
         <label class="toggle-switch">
@@ -158,7 +162,8 @@ function updateTwitchTabsList() {
         </label>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 // 更新最近活動
@@ -177,7 +182,7 @@ function updateRecentActivity() {
     .map(activity => `
       <div class="activity-item">
         <span class="activity-icon">✓</span>
-        <span class="activity-text">在 ${activity.streamer} 領取獎勵</span>
+        <span class="activity-text">在 ${activity.streamer} 獲得 ${activity.points || 50} 點</span>
         <span class="activity-time">${activity.time}</span>
       </div>
     `).join('');
@@ -200,18 +205,6 @@ function attachEventListeners() {
     });
   });
 
-  // 通知開關
-  elements.notificationToggle.addEventListener('change', async (e) => {
-    settings.showNotification = e.target.checked;
-    await saveSettings();
-  });
-
-  // 音效開關
-  elements.soundToggle.addEventListener('change', async (e) => {
-    settings.playSound = e.target.checked;
-    await saveSettings();
-  });
-
   // 檢查間隔
   elements.intervalInput.addEventListener('change', async (e) => {
     const value = parseInt(e.target.value);
@@ -231,8 +224,10 @@ function attachEventListeners() {
   elements.clearDataBtn.addEventListener('click', async () => {
     if (confirm('確定要清除所有記錄嗎？')) {
       stats.todayCount = 0;
-      stats.totalCount = 0;
+      stats.todayPoints = 0;
+      stats.totalPoints = 0;
       stats.recentActivity = [];
+      stats.streamerStats = {};
       await saveStats();
       updateUI();
     }
@@ -306,22 +301,4 @@ async function saveSettings() {
 // 儲存統計
 async function saveStats() {
   await chrome.storage.local.set({ stats });
-}
-
-// 顯示通知
-function showNotification(streamer) {
-  chrome.notifications.create({
-    type: 'basic',
-    iconUrl: 'icons/icon48.png',
-    title: 'Twitch Auto Claim',
-    message: `已在 ${streamer} 頻道領取獎勵！`,
-    priority: 0
-  });
-}
-
-// 播放音效
-function playSound() {
-  const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuFzvLaizsIHm7A7+OZSA0PVqzn77BZFQxMouTwtGQcCDKK0fPTeTAFKHzJ79qOPwsVY7rx6KNQDwpDod/xwmceBDqO0vPPdCwFLIHO8tmKNwofa8Ht5plNDw5Tqufo69RiFg1Hp+HzwmsgBCB8yfDek0MLFWHB7+mhURAOUKbl8bllHAg2jdL00HkwBSh+yO/ekkEMFGO68OmjUhEPR6Pg88JrIQQ7jtHz0XQtBSuBzvLZjTgKH27C7eaZTg8PVKzn6+vVYhYNSKfh88JrIQQ7jtLz0HQtBSuAzvLajTgKH2/C7eWaTg8PVqzn6+vVYxYNR6fh88FrIgQ7jtLz0HQuBSt/zvLajTgKIG/C7eWaTg8PVq3o6+vVYxYMR6fh88FrIgQ6jtLz0HQuBSt/zvLajTgKIG7C7eWaTw8PVq3o6+vWYxYMRqfh88FrIgQ6jtHz0HQuBSt/zvLajTgKH27C7eWaTw8PVq3o6+vWYxYMRqfh88FrIgQ6jtHz0HQuBSuAzvLajTgKH27C7eWaTw8PVq3o6+vWYxYMRqfh88FrIgQ6jtHz0HQuBSuAzvLajTgKH27C7eWaTw8PVq3o6+vWYxYMRqfh88FrIgQ6jtHz0HQuBSuAzvLajTgKH27C7eWaTw8PVq3o6+vWYxYMRqfh88FrIgQ6jtHz0HQuBSuAzvLajTgKH27C7eWaTw8PVq3o6+vWYxYMRqfh88FrIgQ6jtHz0HQuBSuAzvLajTgKH27C7eWaTw8PVq3o6+vWYxYMRqfh88FrIgQ6jtHz0HQuBSuAzvLajTgKH27C7eWaTw8PVq3o6+vWYxYMRqfh88FrIgQ6jtHz0HQuBSuAzvLajTgKH27C7eWaTw8PVq3o6+vWYxYMRqfh88FrIg==');
-  audio.volume = 0.3;
-  audio.play().catch(() => {});
 }

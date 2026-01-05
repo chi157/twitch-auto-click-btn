@@ -111,18 +111,19 @@ input:checked + .slider:before {
 
 .stat-item {
   text-align: center;
+  flex: 1;
 }
 
 .stat-label {
   display: block;
-  font-size: 12px;
+  font-size: 11px;
   color: #666;
   margin-bottom: 5px;
 }
 
 .stat-value {
   display: block;
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 700;
   color: #667eea;
 }
@@ -182,6 +183,12 @@ input:checked + .slider:before {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.tab-stats {
+  font-size: 10px;
+  color: #667eea;
+  margin-top: 3px;
 }
 
 .tab-toggle {
