@@ -270,13 +270,22 @@ const observer = new MutationObserver((mutations) => {
                   const pointsAfter = getCurrentPoints();
                   const pointsEarned = pointsAfter - pointsBefore;
                   
-                  chrome.runtime.sendMessage({
+                  const message = {
                     type: 'BONUS_CLAIMED',
                     streamer: getStreamerName(),
                     time: new Date().toLocaleTimeString('zh-TW'),
                     pointsEarned: pointsEarned > 0 ? pointsEarned : 50, // 預設50點
                     totalPoints: pointsAfter
-                  }).catch(() => {});
+                  };
+                  
+                  console.log(CONFIG.LOG_PREFIX, `📤 發送訊息到 background:`, message);
+                  
+                  chrome.runtime.sendMessage(message).then(() => {
+                    console.log(CONFIG.LOG_PREFIX, `✅ 訊息發送成功`);
+                  }).catch((error) => {
+                    console.error(CONFIG.LOG_PREFIX, `❌ 訊息發送失敗:`, error);
+                    console.error(CONFIG.LOG_PREFIX, `❌ 錯誤詳情:`, error.message);
+                  });
                   
                   console.log(CONFIG.LOG_PREFIX, `✅ 成功點擊！獲得 ${pointsEarned > 0 ? pointsEarned : 50} 點`);
                 }, 1000);

@@ -20,10 +20,9 @@ const elements = {
   globalToggle: null,
   todayCount: null,
   totalCount: null,
+  totalPoints: null,
   twitchTabs: null,
   recentActivity: null,
-  notificationToggle: null,
-  soundToggle: null,
   intervalInput: null,
   clearDataBtn: null,
   refreshBtn: null
@@ -31,6 +30,7 @@ const elements = {
 
 // 初始化
 document.addEventListener('DOMContentLoaded', async () => {
+  console.log('[Popup] Initializing...');
   initElements();
   await loadSettings();
   await loadStats();
@@ -38,8 +38,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateUI();
   attachEventListeners();
   
-  // 監聽來自 content script 的訊息
+  // 監聽來自 background 的訊息
   chrome.runtime.onMessage.addListener(handleMessage);
+  
+  // 監聽 storage 變化，立即更新 UI
+  chrome.storage.onChanged.addListener((changes, namespace) => {
+    if (namespace === 'local' && changes.stats) {
+      console.log('[Popup] 📦 Storage changed, updating UI immediately');
+      loadStats().then(() => {
+        updateUI();
+      });
+    }
+  });
+  
+  // 每 500ms 自動刷新一次資料（當 popup 開啟時）提供即時更新
+  setInterval(async () => {
+    await loadStats();
+    updateUI();
+  }, 500);
+  
+  console.log('[Popup] Initialized successfully');
 });
 
 // 初始化 DOM 元素
@@ -78,6 +96,26 @@ async function loadStats() {
   
   if (result.stats) {
     stats = { ...stats, ...result.stats };
+    
+    console.log('[Popup] Stats loaded:', {
+      todayCount: stats.todayCount,
+      todayPoints: stats.todayPoints,
+      totalPoints: stats.totalPoints,
+      activityCount: stats.recentActivity?.length || 0,
+      streamerCount: Object.keys(stats.streamerStats || {}).length
+    });
+    
+    // 確保 recentActivity 是陣列
+    if (!Array.isArray(stats.recentActivity)) {
+      console.warn('[Popup] recentActivity is not an array, resetting to []');
+      stats.recentActivity = [];
+    }
+    
+    // 確保 streamerStats 是物件
+    if (!stats.streamerStats || typeof stats.streamerStats !== 'object') {
+      console.warn('[Popup] streamerStats is not an object, resetting to {}');
+      stats.streamerStats = {};
+    }
     
     // 檢查是否需要重置今日計數
     const today = new Date().toDateString();
@@ -123,9 +161,12 @@ function updateUI() {
 
 // 更新統計數字
 function updateStats() {
-  elements.todayCount.textContent = stats.todayCount;
-  elements.totalCount.textContent = stats.todayPoints?.toLocaleString() || '0';
-  elements.totalPoints.textContent = stats.totalPoints?.toLocaleString() || '0';
+  // 今日已領 = 今日領取次數
+  elements.todayCount.textContent = stats.todayCount || 0;
+  // 今日點數 = 今日獲得的點數
+  elements.totalCount.textContent = (stats.todayPoints || 0).toLocaleString();
+  // 總計點數 = 累計總點數（跨日累計）
+  elements.totalPoints.textContent = (stats.totalPoints || 0).toLocaleString();
 }
 
 // 更新 Twitch 分頁列表
@@ -168,6 +209,8 @@ function updateTwitchTabsList() {
 
 // 更新最近活動
 function updateRecentActivity() {
+  console.log('[Twitch Auto Claim] Updating recent activity, count:', stats.recentActivity?.length || 0);
+  
   if (!stats.recentActivity || stats.recentActivity.length === 0) {
     elements.recentActivity.innerHTML = `
       <div class="empty-state">
@@ -178,7 +221,7 @@ function updateRecentActivity() {
   }
 
   elements.recentActivity.innerHTML = stats.recentActivity
-    .slice(0, 10) // 只顯示最近 10 筆
+    .slice(0, 20) // 顯示最近 20 筆
     .map(activity => `
       <div class="activity-item">
         <span class="activity-icon">✓</span>
@@ -186,6 +229,8 @@ function updateRecentActivity() {
         <span class="activity-time">${activity.time}</span>
       </div>
     `).join('');
+  
+  console.log('[Twitch Auto Claim] Recent activity updated, showing', Math.min(stats.recentActivity.length, 20), 'items');
 }
 
 // 附加事件監聽器
@@ -223,13 +268,23 @@ function attachEventListeners() {
   // 清除記錄
   elements.clearDataBtn.addEventListener('click', async () => {
     if (confirm('確定要清除所有記錄嗎？')) {
+      // 清除統計但保留資料結構
       stats.todayCount = 0;
       stats.todayPoints = 0;
       stats.totalPoints = 0;
       stats.recentActivity = [];
-      stats.streamerStats = {};
+      // 保留 streamerStats 結構，但重置數值
+      if (stats.streamerStats) {
+        Object.keys(stats.streamerStats).forEach(streamer => {
+          stats.streamerStats[streamer] = { count: 0, points: 0 };
+        });
+      } else {
+        stats.streamerStats = {};
+      }
+      stats.lastResetDate = new Date().toDateString();
       await saveStats();
       updateUI();
+      console.log('[Twitch Auto Claim] Data cleared successfully');
     }
   });
 
@@ -259,37 +314,20 @@ window.toggleTabAutoClick = async function(streamerName, enabled) {
   }
 };
 
-// 處理來自 content script 的訊息
+// 處理來自 background 的訊息
 function handleMessage(message, sender, sendResponse) {
+  console.log('[Popup] 📨 Received message:', message);
+  
   if (message.type === 'BONUS_CLAIMED') {
-    // 更新統計
-    stats.todayCount++;
-    stats.totalCount++;
-    
-    // 新增活動記錄
-    stats.recentActivity.unshift({
-      streamer: message.streamer,
-      time: message.time,
-      timestamp: Date.now()
+    console.log('[Popup] 🎁 Bonus claimed, updating immediately...');
+    // 立即重新載入所有資料
+    Promise.all([
+      loadStats(),
+      loadTwitchTabs()
+    ]).then(() => {
+      updateUI();
+      console.log('[Popup] ✅ UI updated immediately after bonus claimed');
     });
-    
-    // 只保留最近 50 筆
-    if (stats.recentActivity.length > 50) {
-      stats.recentActivity = stats.recentActivity.slice(0, 50);
-    }
-    
-    saveStats();
-    updateUI();
-    
-    // 顯示通知
-    if (settings.showNotification) {
-      showNotification(message.streamer);
-    }
-    
-    // 播放音效
-    if (settings.playSound) {
-      playSound();
-    }
   }
 }
 
