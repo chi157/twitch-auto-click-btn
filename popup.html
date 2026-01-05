@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Twitch Auto Claim Bonus</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- 標題區 -->
+    <div class="header">
+      <h1>🎁 Twitch 自動領取</h1>
+      <div class="version">v1.0.0</div>
+    </div>
+
+    <!-- 全域開關 -->
+    <div class="global-toggle">
+      <label class="toggle-switch">
+        <input type="checkbox" id="globalToggle" checked>
+        <span class="slider"></span>
+      </label>
+      <span class="toggle-label">全域啟用</span>
+    </div>
+
+    <!-- 統計資訊 -->
+    <div class="stats">
+      <div class="stat-item">
+        <span class="stat-label">今日已領取</span>
+        <span class="stat-value" id="todayCount">0</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">總計領取</span>
+        <span class="stat-value" id="totalCount">0</span>
+      </div>
+    </div>
+
+    <!-- 開啟的 Twitch 分頁列表 -->
+    <div class="section">
+      <h2>📺 開啟的實況</h2>
+      <div id="twitchTabs" class="tab-list">
+        <div class="empty-state">
+          <p>沒有開啟的 Twitch 分頁</p>
+          <small>請開啟 Twitch 實況頁面</small>
+        </div>
+      </div>
+    </div>
+
+    <!-- 最近活動 -->
+    <div class="section">
+      <h2>📋 最近活動</h2>
+      <div id="recentActivity" class="activity-list">
+        <div class="empty-state">
+          <p>尚無活動記錄</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 設定區 -->
+    <div class="section">
+      <h2>⚙️ 設定</h2>
+      <div class="settings">
+        <div class="setting-item">
+          <label>
+            <input type="checkbox" id="notificationToggle" checked>
+            顯示領取通知
+          </label>
+        </div>
+        <div class="setting-item">
+          <label>
+            <input type="checkbox" id="soundToggle">
+            播放提示音效
+          </label>
+        </div>
+        <div class="setting-item">
+          <label>
+            檢查間隔（秒）
+            <input type="number" id="intervalInput" min="2" max="10" value="3">
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- 底部按鈕 -->
+    <div class="footer">
+      <button id="clearDataBtn" class="btn btn-secondary">清除記錄</button>
+      <button id="refreshBtn" class="btn btn-primary">重新整理</button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
