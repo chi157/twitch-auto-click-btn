@@ -155,6 +155,9 @@ async function handleBonusClaimed(message, sender) {
     await chrome.storage.local.set({ stats });
     console.log('[Twitch Auto Claim] ✅ Stats saved to storage successfully');
     console.log('[Twitch Auto Claim] 📊 New stats:', JSON.stringify(stats, null, 2));
+    
+    // 通知 Popup 更新 UI
+    chrome.runtime.sendMessage({ type: 'STATS_UPDATED' }).catch(() => {});
   } catch (error) {
     console.error('[Twitch Auto Claim] ❌ Failed to save stats:', error);
     return; // 儲存失敗就不繼續

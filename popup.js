@@ -319,14 +319,15 @@ function handleMessage(message, sender, sendResponse) {
   console.log('[Popup] 📨 Received message:', message);
   
   if (message.type === 'BONUS_CLAIMED') {
-    console.log('[Popup] 🎁 Bonus claimed, updating immediately...');
-    // 立即重新載入所有資料
-    Promise.all([
-      loadStats(),
-      loadTwitchTabs()
-    ]).then(() => {
+    console.log('[Popup] 🎁 Bonus claimed, waiting for storage update...');
+    // 不要在這裡更新，因為 background 可能還沒存檔
+    // 等待 STATS_UPDATED 或 storage.onChanged
+  }
+  
+  if (message.type === 'STATS_UPDATED') {
+    console.log('[Popup] 📊 Stats updated signal received, reloading...');
+    loadStats().then(() => {
       updateUI();
-      console.log('[Popup] ✅ UI updated immediately after bonus claimed');
     });
   }
 }
